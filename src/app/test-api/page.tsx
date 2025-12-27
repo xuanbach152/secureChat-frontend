@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { authService } from "@/services/api/auth.service";
-
+import { AxiosError } from "axios";
 export default function TestAPIPage() {
   const [result, setResult] = useState("");
 
@@ -13,10 +13,11 @@ export default function TestAPIPage() {
         username: "bachhaha",
         password: "123456",
       });
-      setResult("✅ SUCCESS:\n" + JSON.stringify(response, null, 2));
-    } catch (error: any) {
+      setResult(" SUCCESS:\n" + JSON.stringify(response, null, 2));
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
       setResult(
-        "❌ ERROR:\n" +
+        "ERROR:\n" +
           JSON.stringify(error.response?.data || error.message, null, 2)
       );
     }
@@ -25,16 +26,17 @@ export default function TestAPIPage() {
   const testLogin = async () => {
     try {
       const response = await authService.login({
-        identifier: "bach@example.com", // Phải dùng EMAIL, không phải username
+        identifier: "bach@example.com", // Phải dùng EMAIL
         password: "123456",
       });
-      setResult("✅ SUCCESS:\n" + JSON.stringify(response, null, 2));
+      setResult(" SUCCESS:\n" + JSON.stringify(response, null, 2));
 
       // Save token
       authService.saveAuth(response.accessToken, response.user);
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
       setResult(
-        "❌ ERROR:\n" +
+        "ERROR:\n" +
           JSON.stringify(error.response?.data || error.message, null, 2)
       );
     }
@@ -43,10 +45,11 @@ export default function TestAPIPage() {
   const testProfile = async () => {
     try {
       const profile = await authService.getProfile();
-      setResult("✅ SUCCESS:\n" + JSON.stringify(profile, null, 2));
-    } catch (error: any) {
+      setResult("SUCCESS:\n" + JSON.stringify(profile, null, 2));
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
       setResult(
-        "❌ ERROR:\n" +
+        "ERROR:\n" +
           JSON.stringify(error.response?.data || error.message, null, 2)
       );
     }
