@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/api/auth.service";
+import { initializeUserKeys } from "@/services/crypto/crypto-manager.service";
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
@@ -18,12 +19,27 @@ export default function GoogleCallbackPage() {
 
       authService
         .getProfile()
-        .then((user) => {
+        .then(async (user) => {
           localStorage.setItem("user", JSON.stringify(user));
           setUser(user);
+
+          // Initialize crypto keys for this user
+          try {
+            // Ensure _id is string
+            const userId = typeof user._id === 'string' 
+              ? user._id 
+              : String(user._id);
+            
+            await initializeUserKeys(userId);
+            console.log(" Keys initialized for Google OAuth user");
+          } catch (err) {
+            console.error(" Failed to initialize keys:", err);
+          }
+
           router.push("/chat");
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error(" Failed to get profile:", err);
           router.push("/login");
         });
     } else {

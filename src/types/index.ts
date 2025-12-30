@@ -43,8 +43,8 @@ export interface CheckKeysResponse {
 
 export interface Message {
   _id: string;
-  senderId: string;
-  receiverId: string;
+  senderId: string | User; // Can be populated
+  receiverId: string | User; // Can be populated
   roomId: string;
   encryptedContent: string;
   iv: string | null;
