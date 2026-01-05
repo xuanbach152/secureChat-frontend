@@ -3,10 +3,11 @@ import { useAuthStore } from "@/store/auth.store";
 import { useChatStore } from "@/store/chat.store";
 import { socketService } from "@/services/socket/socket.service";
 import {
-  encryptAndSignMessage,
-  decryptAndVerifyMessage,
+  encryptAndSignMessageWithSession,
+  decryptAndVerifyMessageWithSession,
 } from "@/services/crypto/crypto-manager.service";
-import { Message, User } from "@/types";
+import { sessionsService } from "@/services/api/sessions.service";
+import { Message, User, SessionResponse } from "@/types";
 
 export function useSocket() {
   const user = useAuthStore((state) => state.user);
@@ -39,20 +40,28 @@ export function useSocket() {
   useEffect(() => {
     const handleNewMessage = async (message: Message) => {
       try {
-        // Extract senderId (handle both string and populated object)
         const senderId =
           typeof message.senderId === "string"
             ? message.senderId
             : (message.senderId as User)?._id || String(message.senderId);
 
-        console.log(" New message from:", senderId);
+        console.log("New message from:", senderId);
 
-        const plaintext = await decryptAndVerifyMessage(
+        // Fetch session data to get ephemeral keys
+        const session = await sessionsService.getSessionById(message.sessionId);
+        console.log("Session fetched:", session.sessionId);
+
+        // Decrypt message với session keys
+        const plaintext = await decryptAndVerifyMessageWithSession(
           message.encryptedContent,
           message.iv || "",
           message.signature || "",
-          senderId
+          session.theirEcdsaPublicKey,
+          message.sessionId,
+          session.theirEcdhPublicKey
         );
+
+        console.log("Message decrypted successfully");
 
         addMessage({
           ...message,
@@ -63,15 +72,11 @@ export function useSocket() {
           socketService.markAsRead(senderId);
         }
       } catch (error) {
-        console.warn(
-          " Cannot decrypt message (possibly encrypted with old keys):",
-          error
-        );
+        console.warn("Cannot decrypt message:", error);
 
-        // Still add the message but show it as encrypted
         addMessage({
           ...message,
-          content: " [Encrypted - Cannot decrypt. Keys may have changed]",
+          content: "[Cannot decrypt - Session or keys not found]",
         });
       }
     };
@@ -85,7 +90,6 @@ export function useSocket() {
 
   useEffect(() => {
     const handleMessagesRead = (data: { by: string }) => {
-      // Update read status of messages sent to this user
       const messageIds = useChatStore
         .getState()
         .messages.filter((msg) => msg.receiverId === data.by && !msg.isRead)
@@ -122,26 +126,29 @@ export function useSocket() {
   }, [currentChatUser, setTyping]);
 
   const sendMessage = useCallback(
-    async (plaintext: string) => {
-      if (!currentChatUser || !user) {
+    async (plaintext: string, session: SessionResponse) => {
+      if (!currentChatUser) {
         throw new Error("No chat user selected");
       }
 
-      const { encryptedContent, iv, signature } = await encryptAndSignMessage(
-        plaintext,
-        currentChatUser._id
-      );
+      const { encryptedContent, iv, signature, messageKeyInfo } =
+        await encryptAndSignMessageWithSession(
+          plaintext,
+          session.sessionId,
+          session.theirEcdhPublicKey
+        );
 
       await socketService.sendMessage({
         receiverId: currentChatUser._id,
+        sessionId: session.sessionId,
+        messageKeyInfo,
         encryptedContent,
         iv,
         signature,
       });
     },
-    [currentChatUser, user]
+    [currentChatUser]
   );
-
   const markAsRead = useCallback(() => {
     if (!currentChatUser) return;
     socketService.markAsRead(currentChatUser._id);

@@ -70,6 +70,12 @@ class SocketService {
 
   sendMessage(data: {
     receiverId: string;
+    sessionId: string;
+    messageKeyInfo: {
+      messageId: string;
+      nonce: string;
+      sessionId: string;
+    };
     encryptedContent: string;
     iv: string;
     signature: string;

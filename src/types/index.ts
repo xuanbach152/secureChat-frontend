@@ -41,14 +41,22 @@ export interface CheckKeysResponse {
   hasKeys: boolean;
 }
 
+export interface MessageKeyInfo {
+  messageId: string;
+  nonce: string;
+  sessionId: string;
+}
+
 export interface Message {
   _id: string;
   senderId: string | User; // Can be populated
   receiverId: string | User; // Can be populated
   roomId: string;
+  sessionId: string;
   encryptedContent: string;
   iv: string | null;
   signature: string | null;
+  messageKeyInfo: MessageKeyInfo;
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
@@ -58,9 +66,11 @@ export interface Message {
 
 export interface SendMessageDto {
   receiverId: string;
+  sessionId: string;
+  messageKeyInfo: MessageKeyInfo;
   encryptedContent: string;
-  iv?: string;
-  signature?: string;
+  iv: string;
+  signature: string;
 }
 
 export interface GetMessagesResponse {
@@ -121,4 +131,18 @@ export interface StoredPrivateKeys {
 export interface ExportedPublicKeys {
   ecdhPublicKey: string;
   ecdsaPublicKey: string;
+}
+
+export interface SessionResponse {
+  sessionId: string;
+  myUserId: string;
+  otherUserId: string;
+  myEcdhPublicKey: string;
+  myEcdhSignature: string;
+  theirEcdhPublicKey: string;
+  theirEcdhSignature: string;
+  theirEcdsaPublicKey: string;
+  createdAt: string;
+  expiresAt: string;
+  isNew: boolean;
 }
