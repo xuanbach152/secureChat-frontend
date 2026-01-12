@@ -70,15 +70,10 @@ class SocketService {
 
   sendMessage(data: {
     receiverId: string;
-    sessionId: string;
-    messageKeyInfo: {
-      messageId: string;
-      nonce: string;
-      sessionId: string;
-    };
     encryptedContent: string;
     iv: string;
     signature: string;
+    senderEcdhPublicKey: string;
   }): Promise<{ success: boolean }> {
     return new Promise((resolve, reject) => {
       if (!this.socket) {

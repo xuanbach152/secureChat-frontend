@@ -1,12 +1,10 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-// Merge Tailwind classes
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Format date
 export function formatMessageTime(date: string): string {
   const messageDate = new Date(date);
   const now = new Date();

@@ -6,6 +6,8 @@ export interface User {
   avatarUrl?: string;
   isOnline?: boolean;
   provider?: "local" | "google";
+  ecdhPublicKey?: string;
+  ecdsaPublicKey?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -29,34 +31,33 @@ export interface AuthResponse {
 export interface UpdateKeysDto {
   ecdhPublicKey: string;
   ecdsaPublicKey: string;
+  encryptedEcdhPrivateKey: string;
+  encryptedEcdsaPrivateKey: string;
+  keySalt: string;
 }
 
 export interface KeysResponse {
   userId: string;
   ecdhPublicKey: string;
   ecdsaPublicKey: string;
+  encryptedEcdhPrivateKey?: string | null;
+  encryptedEcdsaPrivateKey?: string | null;
+  keySalt?: string | null;
 }
 
 export interface CheckKeysResponse {
   hasKeys: boolean;
 }
 
-export interface MessageKeyInfo {
-  messageId: string;
-  nonce: string;
-  sessionId: string;
-}
-
 export interface Message {
   _id: string;
-  senderId: string | User; // Can be populated
-  receiverId: string | User; // Can be populated
+  senderId: string | User;
+  receiverId: string | User;
   roomId: string;
-  sessionId: string;
   encryptedContent: string;
   iv: string | null;
   signature: string | null;
-  messageKeyInfo: MessageKeyInfo;
+  senderEcdhPublicKey: string;
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
@@ -66,11 +67,10 @@ export interface Message {
 
 export interface SendMessageDto {
   receiverId: string;
-  sessionId: string;
-  messageKeyInfo: MessageKeyInfo;
   encryptedContent: string;
   iv: string;
   signature: string;
+  senderEcdhPublicKey: string;
 }
 
 export interface GetMessagesResponse {
@@ -131,18 +131,4 @@ export interface StoredPrivateKeys {
 export interface ExportedPublicKeys {
   ecdhPublicKey: string;
   ecdsaPublicKey: string;
-}
-
-export interface SessionResponse {
-  sessionId: string;
-  myUserId: string;
-  otherUserId: string;
-  myEcdhPublicKey: string;
-  myEcdhSignature: string;
-  theirEcdhPublicKey: string;
-  theirEcdhSignature: string;
-  theirEcdsaPublicKey: string;
-  createdAt: string;
-  expiresAt: string;
-  isNew: boolean;
 }
