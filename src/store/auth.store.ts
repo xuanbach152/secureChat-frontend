@@ -1,10 +1,14 @@
 import { create } from "zustand";
 import { User } from "@/types";
 import { authService } from "@/services/api/auth.service";
+import { keyManager } from "@/services/crypto/keyManager";
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  ecdsaPrivateKey: CryptoKey | null;
+  setPrivateKey: (key: CryptoKey | null) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (
     email: string,
@@ -20,6 +24,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  ecdsaPrivateKey: null,
+
+  setPrivateKey: (key) => set({ ecdsaPrivateKey: key }),
+
   login: async (email: string, password: string) => {
     const response = await authService.login({
       identifier: email,
@@ -58,11 +66,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     authService.logout();
+    keyManager.clearCache();
 
     set({
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      ecdsaPrivateKey: null,
     });
   },
 

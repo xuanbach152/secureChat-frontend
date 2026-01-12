@@ -27,12 +27,29 @@ export const authService = {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
     return `${API_URL}/auth/google`;
   },
+
   saveAuth(token: string, user: User): void {
     localStorage.setItem("access_token", token);
     localStorage.setItem("user", JSON.stringify(user));
   },
 
+  saveEncryptedKeys(encrypted: string, salt: string): void {
+    localStorage.setItem("encryptedPrivateKey", encrypted);
+    localStorage.setItem("salt", salt);
+  },
+
+  getEncryptedKeys(): { encrypted: string; salt: string } | null {
+    const encrypted = localStorage.getItem("encryptedPrivateKey");
+    const salt = localStorage.getItem("salt");
+
+    if (!encrypted || !salt) return null;
+
+    return { encrypted, salt };
+  },
+
   logout(): void {
+    localStorage.removeItem("encryptedPrivateKey");
+    localStorage.removeItem("salt");
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
   },

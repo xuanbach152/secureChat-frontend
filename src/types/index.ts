@@ -29,20 +29,17 @@ export interface AuthResponse {
 }
 
 export interface UpdateKeysDto {
-  ecdhPublicKey: string;
   ecdsaPublicKey: string;
-  encryptedEcdhPrivateKey: string;
   encryptedEcdsaPrivateKey: string;
   keySalt: string;
 }
 
 export interface KeysResponse {
   userId: string;
-  ecdhPublicKey: string;
-  ecdsaPublicKey: string;
-  encryptedEcdhPrivateKey?: string | null;
+  ecdsaPublicKey: string | null;
   encryptedEcdsaPrivateKey?: string | null;
   keySalt?: string | null;
+  keysUpdatedAt: string | null;
 }
 
 export interface CheckKeysResponse {
