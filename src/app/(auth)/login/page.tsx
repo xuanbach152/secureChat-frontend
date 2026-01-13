@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { keyManager } from "@/services/crypto/keyManager";
 import { useAuthStore } from "@/store/auth.store";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -44,42 +43,14 @@ export default function LoginPage() {
 
       await login(data.email, data.password);
 
-      const user = useAuthStore.getState().user;
-      if (!user) throw new Error("Login failed");
-
-      setLoadingMessage("Đang kiểm tra khóa...");
-      const hasKeys = await keyManager.checkUserHasKeys(user._id);
-
-      if (!hasKeys) {
-    
-        setLoadingMessage("Đang tạo khóa bảo mật...");
-        await keyManager.generateAndUploadKeys(data.password);
-        toast.success("Đã tạo khóa bảo mật!");
-      }
-
-      setLoadingMessage("Đang tải khóa...");
-      const privateKey = await keyManager.loadKeysOnLogin(
-        data.password,
-        user._id
-      );
-
-      setPrivateKey(privateKey);
-      console.log("Private key loaded successfully");
-
+      toast.success("Đăng nhập thành công!");
       router.push("/chat");
     } catch (err: unknown) {
       console.error("Login error:", err);
       if (err instanceof Error) {
-        if (
-          err.message.includes("decrypt") ||
-          err.message.includes("password")
-        ) {
-          setError("Mật khẩu không đúng. Không thể giải mã khóa.");
-        } else if (err.message.includes("No keys found")) {
-          setError("Không tìm thấy khóa. Hệ thống sẽ tạo khóa mới.");
-        } else {
-          setError("Đăng nhập thất bại. Vui lòng thử lại.");
-        }
+        setError(
+          "Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu."
+        );
       } else {
         setError("Đã xảy ra lỗi không xác định.");
       }

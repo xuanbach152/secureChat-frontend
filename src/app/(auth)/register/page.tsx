@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AxiosError } from "axios";
 import toast from "react-hot-toast";
-import { keyManager } from "@/services/crypto/keyManager";
 import { useAuthStore } from "@/store/auth.store";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -49,7 +48,7 @@ export default function RegisterPage() {
     try {
       setIsLoading(true);
       setError("");
-      setLoadingMessage("Đang tạo tài khoản...");
+      setLoadingMessage("Đang tạo tài khoản và khóa bảo mật...");
 
       await register(
         data.email,
@@ -58,30 +57,29 @@ export default function RegisterPage() {
         data.displayName
       );
 
-      setLoadingMessage("Đang tạo khóa bảo mật...");
-      await keyManager.generateAndUploadKeys(data.password);
-      toast.success("Đã tạo khóa bảo mật!");
+      toast.success("Đăng ký thành công! Vui lòng đăng nhập.");
 
-      setLoadingMessage("Đang tải khóa...");
-      const privateKey = await keyManager.loadKeysOnLogin(data.password);
-
-      setPrivateKey(privateKey);
-      console.log("Registration complete with keys");
-
-      toast.success("Tài khoản đã được tạo thành công!");
-
-      router.push("/chat");
+      // Redirect to login page after successful registration
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
     } catch (err: unknown) {
       console.error("Register error:", err);
       if (err instanceof AxiosError) {
         const message = err.response?.data?.message || err.message;
-        if (message.includes("email")) {
-          setError("Email đã được sử dụng.");
-        } else if (message.includes("username")) {
-          setError("Username đã được sử dụng.");
+
+        // Handle specific error messages from backend
+        if (message.toLowerCase().includes("email")) {
+          setError("Email đã được sử dụng. Vui lòng sử dụng email khác.");
+        } else if (message.toLowerCase().includes("username")) {
+          setError("Username đã được sử dụng. Vui lòng chọn username khác.");
+        } else if (err.response?.status === 409) {
+          setError("Email hoặc Username đã tồn tại. Vui lòng thử lại.");
         } else {
-          setError("Đăng ký thất bại. Vui lòng thử lại.");
+          setError(message || "Đăng ký thất bại. Vui lòng thử lại.");
         }
+
+        toast.error("Đăng ký thất bại!");
       } else if (err instanceof Error) {
         setError(err.message || "Đã xảy ra lỗi.");
       } else {

@@ -18,7 +18,6 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
 
-
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
@@ -29,13 +28,13 @@ export default function ChatPage() {
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (token && user) {
-      console.log("🔌 Connecting WebSocket...");
+      console.log("Connecting WebSocket...");
       socketService.connect(token);
 
       // Wait a bit for connection to establish
       setTimeout(() => {
         setSocketConnected(true);
-        console.log(" WebSocket connected");
+        console.log("WebSocket connected");
       }, 1000);
     }
 
@@ -48,9 +47,9 @@ export default function ChatPage() {
   useEffect(() => {
     async function fetchOnlineUsers() {
       try {
-        console.log(" Fetching online users...");
+        console.log("Fetching online users...");
         const users = await usersService.getOnlineUsers();
-        console.log(" Online users:", users);
+        console.log("Online users:", users);
         setOnlineUsers(users);
       } catch (error) {
         console.error(" Failed to fetch online users:", error);

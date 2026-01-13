@@ -6,27 +6,41 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3000";
 class SocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
+  private isConnecting: boolean = false;
 
   connect(token: string): void {
-    if (this.socket?.connected) {
-      console.log("Socket already connected");
+    // Prevent duplicate connections in React strict mode
+    if (this.socket?.connected || this.isConnecting) {
+      console.log("Socket already connected or connecting");
       return;
     }
+
+    // Disconnect old socket if exists
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
+    this.isConnecting = true;
     this.token = token;
     this.socket = io(WS_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      timeout: 10000,
     });
     this.setupEventListeners();
   }
   disconnect(): void {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
-      console.log(" Socket disconnected");
+      this.isConnecting = false;
+      console.log("Socket disconnected");
     }
   }
 
@@ -38,15 +52,26 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
+      this.isConnecting = false;
       console.log("Socket connected:", this.socket?.id);
     });
 
     this.socket.on("disconnect", (reason) => {
+      this.isConnecting = false;
       console.log("Socket disconnected:", reason);
     });
 
     this.socket.on("connect_error", (error) => {
+      this.isConnecting = false;
       console.error("Socket connection error:", error.message);
+    });
+
+    this.socket.on("reconnect", (attemptNumber) => {
+      console.log("Socket reconnected after", attemptNumber, "attempts");
+    });
+
+    this.socket.on("reconnect_attempt", () => {
+      console.log("Attempting to reconnect...");
     });
   }
 
@@ -61,7 +86,7 @@ class SocketService {
         "joinRoom",
         { otherUserId },
         (response: { roomId: string }) => {
-          console.log(" Joined room:", response.roomId);
+          console.log("Joined room:", response.roomId);
           resolve(response);
         }
       );
@@ -73,7 +98,6 @@ class SocketService {
     encryptedContent: string;
     iv: string;
     signature: string;
-    senderEcdhPublicKey: string;
   }): Promise<{ success: boolean }> {
     return new Promise((resolve, reject) => {
       if (!this.socket) {

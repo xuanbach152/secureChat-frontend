@@ -34,9 +34,28 @@ export const useChatStore = create<ChatState>((set) => ({
   setCurrentChatUser: (user) => set({ currentChatUser: user }),
 
   addMessage: (message) =>
-    set((state) => ({
-      messages: [...state.messages, message],
-    })),
+    set((state) => {
+      // Check if message already exists (prevent duplicates)
+      const exists = state.messages.some(
+        (m) =>
+          m._id === message._id ||
+          (m._id.startsWith("temp-") &&
+            m.encryptedContent === message.encryptedContent &&
+            Math.abs(
+              new Date(m.createdAt).getTime() -
+                new Date(message.createdAt).getTime()
+            ) < 5000) // Within 5 seconds
+      );
+
+      if (exists) {
+        console.log("[STORE] Message already exists, skipping duplicate");
+        return state;
+      }
+
+      return {
+        messages: [...state.messages, message],
+      };
+    }),
 
   setMessages: (messages) => set({ messages }),
 

@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { User } from "@/types";
 import { authService } from "@/services/api/auth.service";
-import { keyManager } from "@/services/crypto/keyManager";
 
 interface AuthState {
   user: User | null;
@@ -66,7 +65,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     authService.logout();
-    keyManager.clearCache();
 
     set({
       user: null,

@@ -1,126 +1,121 @@
-import { keysService } from "../api/keys.service";
-import { authService } from "../api/auth.service";
-import {
-  generateECDSAKeyPair,
-  exportPublicKey,
-  exportPrivateKey,
-  importPublicKey,
-  encryptPrivateKey,
-  decryptPrivateKey,
-} from "@/lib/crypto";
+import { openDB } from "idb";
+import * as ecdsa from "@/lib/crypto/ecdsa";
+import * as ecdh from "@/lib/crypto/ecdh";
 
-export const keyManager = {
-  publicKeyCache: new Map<string, CryptoKey>(),
+const DB_NAME = "securechat-keys";
+const STORE_NAME = "keys";
 
-  async checkUserHasKeys(userId: string): Promise<boolean> {
-    try {
-      const hasKeys = await keysService.checkKeysExist(userId);
-      return hasKeys;
-    } catch (error) {
-      console.error("Error checking keys:", error);
-      return false;
+export interface KeyPair {
+  ecdsaPrivateKey: CryptoKey;
+  ecdsaPublicKey: string;
+  ecdhPrivateKey: CryptoKey;
+  ecdhPublicKey: string;
+}
+
+async function getDB() {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    },
+  });
+}
+
+export async function generateAndStoreKeys(userId: string): Promise<KeyPair> {
+  // Generate ECDSA keypair for signing
+  const ecdsaKeyPair = await ecdsa.generateECDSAKeyPair();
+  const ecdsaPublicKeyJwk = await ecdsa.exportPublicKey(ecdsaKeyPair.publicKey);
+  const ecdsaPrivateKeyJwk = await ecdsa.exportPrivateKey(
+    ecdsaKeyPair.privateKey
+  );
+
+  // Generate ECDH keypair for key exchange
+  const ecdhKeyPair = await ecdh.generateECDHKeyPair();
+  const ecdhPublicKeyJwk = await ecdh.exportPublicKeyJwk(ecdhKeyPair.publicKey);
+  const ecdhPrivateKeyJwk = await crypto.subtle.exportKey(
+    "jwk",
+    ecdhKeyPair.privateKey
+  );
+
+  // Store private keys in IndexedDB
+  const db = await getDB();
+  await db.put(STORE_NAME, ecdsaPrivateKeyJwk, `${userId}-ecdsa-private`);
+  await db.put(STORE_NAME, ecdhPrivateKeyJwk, `${userId}-ecdh-private`);
+
+  console.log("Keys generated and stored in IndexedDB");
+
+  return {
+    ecdsaPrivateKey: ecdsaKeyPair.privateKey,
+    ecdsaPublicKey: ecdsaPublicKeyJwk,
+    ecdhPrivateKey: ecdhKeyPair.privateKey,
+    ecdhPublicKey: ecdhPublicKeyJwk,
+  };
+}
+
+export async function loadKeysFromStorage(
+  userId: string
+): Promise<KeyPair | null> {
+  try {
+    const db = await getDB();
+    const ecdsaPrivateKeyJwk = await db.get(
+      STORE_NAME,
+      `${userId}-ecdsa-private`
+    );
+    const ecdhPrivateKeyJwk = await db.get(
+      STORE_NAME,
+      `${userId}-ecdh-private`
+    );
+
+    if (!ecdsaPrivateKeyJwk || !ecdhPrivateKeyJwk) {
+      return null;
     }
-  },
 
-  async generateAndUploadKeys(password: string): Promise<void> {
-    try {
-      const keyPair = await generateECDSAKeyPair();
+    // Import private keys
+    const ecdsaPrivateKey = await ecdsa.importPrivateKey(ecdsaPrivateKeyJwk);
+    const ecdhPrivateKey = await crypto.subtle.importKey(
+      "jwk",
+      ecdhPrivateKeyJwk,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
 
-      const publicKeyJwk = await exportPublicKey(keyPair.publicKey);
+    // Export public keys (from private keys)
+    const ecdsaPublicKeyJwk = await ecdsa.exportPublicKey(
+      await crypto.subtle.importKey(
+        "jwk",
+        { ...ecdsaPrivateKeyJwk, d: undefined, key_ops: ["verify"] },
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["verify"]
+      )
+    );
 
-      const privateKeyJwk = await exportPrivateKey(keyPair.privateKey);
+    const ecdhPublicKeyJwk = JSON.stringify({
+      kty: ecdhPrivateKeyJwk.kty,
+      crv: ecdhPrivateKeyJwk.crv,
+      x: ecdhPrivateKeyJwk.x,
+      y: ecdhPrivateKeyJwk.y,
+    });
 
-      const { encrypted, salt } = await encryptPrivateKey(
-        privateKeyJwk,
-        password
-      );
+    console.log("Keys loaded from IndexedDB");
 
-      authService.saveEncryptedKeys(encrypted, salt);
+    return {
+      ecdsaPrivateKey,
+      ecdsaPublicKey: ecdsaPublicKeyJwk,
+      ecdhPrivateKey,
+      ecdhPublicKey: ecdhPublicKeyJwk,
+    };
+  } catch (error) {
+    console.error("Failed to load keys:", error);
+    return null;
+  }
+}
 
-      await keysService.uploadEncryptedKeys({
-        ecdsaPublicKey: publicKeyJwk,
-        encryptedEcdsaPrivateKey: encrypted,
-        keySalt: salt,
-      });
-
-      console.log("Keys generated and uploaded successfully");
-    } catch (error) {
-      console.error("Failed to generate keys:", error);
-      throw new Error("Failed to generate keys");
-    }
-  },
-
-  async loadKeysOnLogin(password: string, userId?: string): Promise<CryptoKey> {
-    try {
-      let keys = authService.getEncryptedKeys();
-
-      if (!keys && userId) {
-        console.log("Keys not in localStorage, fetching from backend...");
-        const response = await keysService.getEncryptedKeys(userId);
-
-        if (!response.encryptedEcdsaPrivateKey || !response.keySalt) {
-          throw new Error("User has no encrypted keys on backend");
-        }
-
-        authService.saveEncryptedKeys(
-          response.encryptedEcdsaPrivateKey,
-          response.keySalt
-        );
-
-        keys = {
-          encrypted: response.encryptedEcdsaPrivateKey,
-          salt: response.keySalt,
-        };
-        console.log(" Keys fetched from backend and saved to localStorage");
-      }
-
-      if (!keys) {
-        throw new Error("No keys found in localStorage or backend");
-      }
-
-      const privateKey = await decryptPrivateKey(
-        keys.encrypted,
-        keys.salt,
-        password
-      );
-
-      console.log("Private key loaded successfully");
-      return privateKey;
-    } catch (error) {
-      console.error("Failed to load keys:", error);
-      if (error instanceof Error && error.message.includes("decrypt")) {
-        throw new Error("Incorrect password or corrupted key");
-      }
-      throw error;
-    }
-  },
-
-  async fetchUserPublicKey(userId: string): Promise<CryptoKey> {
-    try {
-      if (this.publicKeyCache.has(userId)) {
-        return this.publicKeyCache.get(userId)!;
-      }
-
-      const response = await keysService.getPublicKeys(userId);
-      const publicKeyJwk = response.ecdsaPublicKey;
-
-      if (!publicKeyJwk) {
-        throw new Error(`User ${userId} has no public key`);
-      }
-
-      const publicKey = await importPublicKey(publicKeyJwk);
-
-      this.publicKeyCache.set(userId, publicKey);
-
-      return publicKey;
-    } catch (error) {
-      console.error(`Failed to fetch public key for ${userId}:`, error);
-      throw error;
-    }
-  },
-
-  clearCache(): void {
-    this.publicKeyCache.clear();
-    console.log("Public key cache cleared");
-  },
-};
+export async function clearKeys(userId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete(STORE_NAME, `${userId}-ecdsa-private`);
+  await db.delete(STORE_NAME, `${userId}-ecdh-private`);
+  console.log("Keys cleared from IndexedDB");
+}
