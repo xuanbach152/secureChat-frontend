@@ -106,7 +106,7 @@ export default function ChatWindow() {
               );
 
               if (!msg.iv) {
-                return { ...msg, content: "[Missing IV]" };
+                return { ...msg, content: "[Thiếu IV]" };
               }
 
               const plaintext = await aes.decrypt(
@@ -122,9 +122,17 @@ export default function ChatWindow() {
               );
 
               return { ...msg, content: plaintext };
-            } catch (error) {
+            } catch (error: any) {
               console.error("[HISTORY] Failed to decrypt message:", error);
-              return { ...msg, content: "[Failed to decrypt - old message]" };
+              
+              // Check error type
+              if (error?.message?.includes("My keys not found")) {
+                return { ...msg, content: "[Không thể giải mã - Thiếu private key. Vui lòng đăng xuất và đăng nhập lại]" };
+              } else if (error?.message?.includes("public key not found")) {
+                return { ...msg, content: "[Không thể giải mã - Thiếu public key của người gửi]" };
+              } else {
+                return { ...msg, content: "[Không thể giải mã - Tin nhắn được mã hóa với key cũ]" };
+              }
             }
           })
         );
